@@ -1,0 +1,53 @@
+---
+# tasks file for init_npm
+
+- name: Je vérifie la connexion au Nginx Proxy Manager
+  ansible.builtin.wait_for:
+    host: npm.blasi.home
+    port: 81
+    state: started
+    delay: 30
+
+- name: Je récupère le token sur NPM
+  ansible.builtin.uri:
+    url: "http://{{ dnsname_npm }}/api/tokens"
+    method: POST
+    return_content: true
+    status_code:
+      - 200
+      - 401
+    body:
+      identity: "{{ login_npm }}"
+      secret: "{{ password_npm }}"
+    body_format: form-multipart
+  register: token_npm
+
+- name: Je change le login mot de passe
+  when: change_password is true
+  block:
+    - name: Je modifie les infos de l'admin
+      ansible.builtin.uri:
+        url: "http://{{ dnsname_npm }}/api/users/1"
+        method: PUT
+        return_content: true
+        headers:
+          Authorization: "Bearer {{ token_npm.json.token }}"
+        body_format: form-multipart
+        body:
+          name: "{{ username_npm }}"
+          nickname: "{{ username_npm }}"
+          email: "{{ new_login_npm }}"
+
+    - name: Je change le mot de passe de l'admin
+      ansible.builtin.uri:
+        url: "http://{{ dnsname_npm }}/api/users/1/auth"
+        method: PUT
+        return_content: true
+        status_code: 201
+        headers:
+          Authorization: "Bearer {{ token_npm.json.token }}"
+        body_format: form-multipart
+        body:
+          type: "password"
+          secret: "{{ new_password_npm }}"
+          current: "{{ password_npm }}"
